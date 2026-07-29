@@ -1,0 +1,457 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>数学 · 查漏补缺工作台</title>
+<style>
+*{box-sizing:border-box;}
+body{margin:0;background:#0f1115;color:#d7dde6;
+  font-family:-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;font-size:13px;}
+button{font-family:inherit;}
+.cfg{background:#161a21;border:1px solid #262c38;border-radius:10px 10px 0 0;
+  padding:10px 12px;display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;}
+.cfg .fld{flex:1;min-width:200px;}
+.cfg .lab{color:#8b95a3;font-size:11px;display:block;margin-bottom:4px;}
+.cfg input{width:100%;background:#0f1115;border:1px solid #262c38;color:#d7dde6;
+  padding:7px 9px;border-radius:7px;font-size:12px;}
+.cfg .adv{flex-basis:100%;}
+.cfg .btn{background:#7aa2f714;border:1px solid #7aa2f7;color:#7aa2f7;
+  padding:8px 14px;border-radius:7px;cursor:pointer;font-size:12.5px;height:33px;}
+.cfg .hide{background:none;border:1px solid #262c38;color:#8b95a3;padding:0;width:22px;height:22px;
+  border-radius:5px;cursor:pointer;font-size:14px;line-height:1;display:inline-flex;
+  align-items:center;justify-content:center;}
+.showbtn{display:none;background:none;border:1px solid #262c38;color:#8b95a3;padding:0;
+  width:22px;height:22px;border-radius:5px;cursor:pointer;font-size:15px;line-height:1;
+  align-items:center;justify-content:center;}
+.body{flex:1;display:flex;min-height:0;height:calc(100vh - 56px);
+  border:1px solid #262c38;border-top:none;border-radius:0 0 10px 10px;overflow:hidden;margin:0 0 8px;}
+.tree{width:240px;min-width:130px;background:#0f1115;display:flex;flex-direction:column;
+  border-right:1px solid #262c38;}
+.tree .th{padding:9px 11px;font-size:12px;color:#7aa2f7;display:flex;
+  justify-content:space-between;align-items:center;border-bottom:1px solid #1b212c;}
+.tree .th button{background:none;border:1px solid #262c38;color:#8b95a3;border-radius:5px;
+  cursor:pointer;font-size:14px;line-height:1;width:20px;height:20px;padding:0;
+  display:inline-flex;align-items:center;justify-content:center;}
+.tree .tc{overflow:auto;flex:1;padding:6px 4px;}
+.node{display:flex;align-items:center;gap:4px;padding:4px 8px;border-radius:6px;
+  cursor:pointer;color:#c2cad6;user-select:none;font-size:12.5px;}
+.node:hover{background:#161a21;}
+.node .ar{display:inline-block;width:13px;color:#5f6b7d;flex:none;}
+.node.dir{color:#8b95a3;}
+.node.file{color:#d7dde6;}
+.node.file.sel{background:#7aa2f71f;color:#7aa2f7;}
+.node .dot{width:5px;height:5px;border-radius:50%;background:#3b6d11;flex:none;margin-left:auto;}
+.node .dot.no{background:#3a3f4a;}
+.note{flex:1.2 1 480px;min-width:300px;background:#0f1115;display:flex;flex-direction:column;
+  border-right:1px solid #262c38;}
+.note .sb{padding:9px 11px;border-bottom:1px solid #1b212c;display:flex;gap:7px;}
+.note .sb input{flex:1;background:#0f1115;border:1px solid #262c38;color:#d7dde6;
+  padding:7px 9px;border-radius:7px;font-size:12.5px;}
+.note .sb .btn{background:#7aa2f714;border:1px solid #7aa2f7;color:#7aa2f7;
+  padding:7px 12px;border-radius:7px;cursor:pointer;font-size:12.5px;}
+.note .nh{padding:7px 11px;font-size:12px;font-weight:600;color:#7aa2f7;
+  background:#12161f;border-bottom:1px solid #1b212c;flex:none;letter-spacing:.3px;}
+.note .nv{flex:1.9;overflow:auto;padding:13px 15px;font-size:13px;line-height:1.72;color:#d7dde6;
+  background:#0f1115;word-wrap:break-word;overflow-wrap:break-word;}
+/* 笔记内部元素基础样式兜底 */
+.note .nv h1,.note .nv h2,.note .nv h3,.note .nv h4{color:#e4e8ef;margin:14px 0 8px;line-height:1.4;}
+.note .nv h1{font-size:18px;border-bottom:1px solid #262c38;padding-bottom:6px;}
+.note .nv h2{font-size:15px;}
+.note .nv h3{font-size:14px;}
+.note .nv p{margin:6px 0;}
+.note .nv ul,.note .nv ol{margin:6px 0;padding-left:22px;}
+.note .nv li{margin:3px 0;}
+.note .nv table{border-collapse:collapse;width:100%;max-width:100%;margin:10px 0;
+  font-size:12.5px;display:block;overflow-x:auto;-webkit-overflow-scrolling:touch;}
+.note .nv th,.note .nv td{border:1px solid #3a4150;padding:6px 10px;text-align:left;white-space:nowrap;}
+.note .nv th{background:#161a21;color:#9ece6a;font-weight:600;}
+.note .nv td{background:#12161f;}
+.note .nv img{max-width:100%;height:auto;border-radius:6px;display:block;margin:8px auto;}
+.note .nv pre{background:#12161f;border:1px solid #262c38;border-radius:6px;padding:10px 12px;
+  overflow-x:auto;font-size:12px;margin:8px 0;}
+.note .nv code{background:#1b212c;color:#9ece6a;padding:1px 5px;border-radius:3px;font-size:12px;
+  font-family:'Cascadia Code','Consolas','Courier New',monospace;display:inline;word-break:break-all;}
+/* 独立代码块(含ASCII图表)可横向滚动 */
+.note .nv li > code,.note .nv p > code{display:block;overflow-x:auto;
+  padding:8px 10px;white-space:pre;margin:4px 0;}
+.note .nv pre code{background:none;padding:0;border-radius:0;font-size:inherit;}
+.note .nv blockquote{border-left:3px solid #7aa2f7;margin:8px 0;padding:6px 14px;background:#12161f;
+  color:#a0aab8;font-style:normal;}
+.note .nv hr{border:none;border-top:1px solid #262c38;margin:12px 0;}
+.note .nv strong{color:#e4e8ef;font-weight:700;}
+.note .nv em{color:#c2cad6;}
+
+/* 覆盖原始笔记(voicenotes)的亮色主题样式 */
+.note .nv .note-container{padding-left:0 !important;max-width:none !important;}
+.note .nv .note{background:transparent !important;color:inherit !important;
+  padding:0 !important;box-shadow:none !important;border-radius:0 !important;max-width:none !important;}
+.note .nv body,.note .nv [style*="background"]{background:transparent !important;color:#d7dde6 !important;}
+.note .rzH{height:7px;cursor:row-resize;background:transparent;flex:none;}
+.note .rzH:hover{background:#7aa2f733;}
+.note .sv{flex:1;display:flex;flex-direction:column;min-height:0;border-top:1px solid #1b212c;background:#0c0e13;font-size:12px;}
+.note .sv .sh{padding:5px 7px 7px;font-size:11px;color:#8b95a3;background:#0c0e13;border-bottom:1px solid #1b212c;flex:none;}
+.note .sv .svc{overflow:auto;flex:1;padding:4px 6px;min-height:0;}
+.sr{display:flex;gap:8px;padding:5px 8px;border-radius:6px;cursor:pointer;font-size:12px;color:#c2cad6;}
+.sr:hover{background:#161a21;}
+.sr.hi{background:#7aa2f71f;}
+.sr.cur{background:#1d2a3a;color:#eaf1fb;border-left:2px solid #7aa2f7;padding-left:6px;}
+.sr .ts{color:#9ece6a;font-variant-numeric:tabular-nums;white-space:nowrap;font-size:11.5px;}
+.video{flex:1.6 1 300px;min-width:260px;background:#0f1115;display:flex;flex-direction:column;}
+.video .vh{padding:9px 11px;font-size:12px;color:#7aa2f7;border-bottom:1px solid #1b212c;
+  display:flex;justify-content:space-between;align-items:center;gap:8px;}
+.video .vh span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.video .vh button{background:none;border:1px solid #262c38;color:#8b95a3;border-radius:5px;
+  cursor:pointer;font-size:14px;line-height:1;width:20px;height:20px;padding:0;flex:none;
+  display:inline-flex;align-items:center;justify-content:center;}
+.vplayer{flex:1;background:#05070a;display:flex;align-items:center;justify-content:center;
+  color:#4a5365;font-size:12px;position:relative;margin:10px;border-radius:8px;border:1px solid #262c38;overflow:hidden;}
+.vplayer video{max-width:100%;max-height:100%;}
+.pbar{position:absolute;left:12px;right:12px;bottom:10px;height:5px;background:#262c38;border-radius:3px;}
+.pbar i{position:absolute;left:0;top:0;bottom:0;width:0;background:#7aa2f7;border-radius:3px;}
+.seek{position:absolute;top:10px;left:12px;background:#7aa2f71f;border:1px solid #7aa2f7;color:#7aa2f7;
+  font-size:11px;padding:3px 9px;border-radius:6px;opacity:0;transition:opacity .2s;}
+.hint{font-size:11px;color:#8b95a3;padding:6px 11px;}
+.rz{width:5px;cursor:col-resize;background:transparent;flex:none;}
+.rz:hover{background:#7aa2f733;}
+mark{background:#ef9f2744;color:#fac775;border-radius:2px;}
+.empty{padding:24px 16px;color:#5f6b7d;font-size:12.5px;text-align:center;}
+</style>
+</head>
+<body>
+<div class="cfg" id="cfg">
+  <div class="fld"><span class="lab">课程文件夹（mp4 / srt / html 三者同处此文件夹，单路径即可加载；字幕亦自动匹配同级目录）</span>
+    <input id="videoDir" placeholder="如 D:/File/谢奕田/学科/数学"></div>
+  <button class="btn" id="loadBtn">加载</button>
+  <button class="hide" id="hideCfg" title="隐藏配置栏">×</button>
+</div>
+<button class="showbtn" id="showCfg" title="显示配置栏">＋</button>
+
+<div class="body">
+  <div class="tree" id="tree">
+    <div class="th"><span>课程内容</span>
+      <button id="hideTree" title="隐藏课程树">×</button></div>
+    <div class="tc" id="tc"><div class="empty">加载后显示课程树</div></div>
+  </div>
+  <button class="showbtn" id="showTree" style="margin:6px 4px;align-self:flex-start;" title="显示课程树">＋</button>
+  <div class="rz" id="rzTree"></div>
+
+  <div class="note" id="note">
+    <div class="sb"><input id="q" placeholder="搜索关键字，同步标记笔记区与字幕区">
+      <button class="btn" id="searchBtn">搜索</button></div>
+    <div class="nh">AI 总结笔记</div>
+    <div class="nv" id="nv"><div class="empty">选择左侧课程后，此处显示 AI 总结笔记</div></div>
+    <div class="rzH" id="rzNoteSrt" title="拖动调整笔记区 / 字幕区高度"></div>
+    <div class="sv" id="sv"><div class="sh" id="sh">SRT 字幕（双击任一行 → 右栏视频跳播）</div>
+      <div class="svc" id="svc"><div class="empty" style="padding:14px;">暂无字幕</div></div></div>
+  </div>
+  <div class="rz" id="rzNote"></div>
+
+  <div class="video" id="video">
+    <div class="vh" id="vh"><span id="vhText">视频回看 · 未选择课程</span>
+      <button id="hideVideo" title="隐藏视频区">×</button></div>
+    <div class="vplayer"><video id="vid" controls preload="metadata"></video>
+      <div class="seek" id="seek">▶ 跳至 00:00</div>
+      <div class="pbar"><i id="pbi"></i></div></div>
+    <div class="hint">双击中间字幕行可跳播；搜索结果在笔记区与字幕区同步高亮。</div>
+  </div>
+  <button class="showbtn" id="showVideo" style="margin:6px 4px;align-self:flex-start;" title="显示视频区">＋</button>
+</div>
+
+<script>
+const enc = p => encodeURIComponent(p);
+let CUR = {note:null, srt:null, segments:null, kw:""};
+
+// ---------- 配置加载 ----------
+document.getElementById("loadBtn").onclick = async () => {
+  const v = document.getElementById("videoDir").value.trim();
+  const btn = document.getElementById("loadBtn");
+  btn.textContent = "加载中…";
+  try {
+    const r = await fetch("/api/config", {method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body: JSON.stringify({root_dir:v})});
+    const d = await r.json();
+    if (!d.ok) { alert("加载失败：" + d.error); return; }
+    renderTree(d.tree);
+    document.querySelector("#tree .th span").textContent =
+      "课程内容 (" + d.stats.total + " 节 · 笔记 " + d.stats.with_note +
+      " · 字幕 " + d.stats.with_srt + ")";
+  } catch(e) { alert("请求出错：" + e); }
+  finally { btn.textContent = "加载"; }
+};
+
+// ---------- 课程树 ----------
+function renderTree(nodes){
+  const tc = document.getElementById("tc");
+  tc.innerHTML = "";
+  (nodes||[]).forEach(nd => tc.appendChild(treeNode(nd, 0)));
+}
+function treeNode(nd, depth){
+  const el = document.createElement("div");
+  el.className = "node " + (nd.type === "dir" ? "dir" : "file");
+  el.style.paddingLeft = (8 + depth*14) + "px";
+  if (nd.type === "dir"){
+    const ar = document.createElement("span"); ar.className="ar"; ar.textContent="▾";
+    const lab = document.createElement("span"); lab.textContent = nd.name;
+    el.appendChild(ar); el.appendChild(lab);
+    const childWrap = document.createElement("div");
+    nd.children.forEach(c => childWrap.appendChild(treeNode(c, depth+1)));
+    el.onclick = () => {
+      const open = ar.textContent === "▾";
+      ar.textContent = open ? "▸" : "▾";
+      childWrap.style.display = open ? "none" : "block";
+    };
+    const wrap = document.createElement("div");
+    wrap.appendChild(el); wrap.appendChild(childWrap);
+    return wrap;
+  } else {
+    const lab = document.createElement("span"); lab.textContent = nd.name;
+    const dot = document.createElement("span");
+    dot.className = "dot" + (nd.note ? "" : " no");
+    dot.title = nd.note ? "有 AI 笔记" : "无 AI 笔记";
+    el.appendChild(lab); el.appendChild(dot);
+    el.onclick = () => selectLeaf(nd, el);
+    return el;
+  }
+}
+
+// ---------- 选择课程 ----------
+async function selectLeaf(nd, el){
+  document.querySelectorAll(".node.file.sel").forEach(n=>n.classList.remove("sel"));
+  el.classList.add("sel");
+  const vid = document.getElementById("vid");
+  vid.src = "/video?path=" + enc(nd.path);
+  vid.load();
+  document.getElementById("vhText").textContent = "视频回看 · " + nd.name;
+  CUR.note = nd.note; CUR.srt = nd.srt; CUR.segments = null; CUR.kw = "";
+  document.getElementById("q").value = "";
+
+  const nv = document.getElementById("nv");
+  if (nd.note){
+    try {
+      const r = await fetch("/note?path=" + enc(nd.note));
+      let html = await r.text();
+      html = rewriteAssets(html, nd.note);
+      nv.dataset.raw = html;
+      nv.innerHTML = html;
+    } catch(e){ nv.innerHTML = '<div class="empty">笔记加载失败</div>'; }
+  } else {
+    nv.dataset.raw = "";
+    nv.innerHTML = '<div class="empty">本节无 AI 笔记</div>';
+  }
+
+  if (nd.srt){
+    try {
+      const r = await fetch("/srt?path=" + enc(nd.srt));
+      const d = await r.json();
+      CUR.segments = d.segments;
+      renderSrt("");
+    } catch(e){ document.getElementById("svc").innerHTML = '<div class="empty">字幕加载失败</div>'; }
+  } else {
+    CUR.segments = null;
+    document.getElementById("svc").innerHTML = '<div class="empty">本节无字幕</div>';
+  }
+}
+
+function rewriteAssets(html, notePath){
+  // 去除脚本, 避免意外执行; 重写相对资源到 /noteasset
+  html = html.replace(/<script[\s\S]*?<\/script>/gi, "");
+  html = html.replace(/<script[^>]*>/gi, "");
+  const dir = notePath.replace(/[\\\/][^\\\/]*$/, "");
+  html = html.replace(/(src|href)\s*=\s*"([^"]+)"/gi, (m, attr, url) => {
+    if (/^(https?:|data:|#|\/noteasset)/i.test(url)) return m;
+    const abs = dir + "/" + url;
+    return attr + '="/noteasset?path=' + enc(abs) + '"';
+  });
+  return html;
+}
+
+// ---------- 字幕渲染 + 跳播 ----------
+function renderSrt(kw){
+  const svc = document.getElementById("svc");
+  const sh = document.getElementById("sh");
+  const segs = CUR.segments || [];
+  _curIdx = -1;
+  sh.textContent = "SRT 字幕（双击任一行 → 右栏视频跳播）" +
+    (kw ? " · 命中 " + segs.filter(s=>looseMatch(s.text, kw)).length + " 段" : "");
+  if (!segs.length){ svc.innerHTML = '<div class="empty">本节无字幕</div>'; return; }
+  let h = "";
+  segs.forEach((s, i) => {
+    const t = fmt(s.start);
+    const txt = highlightSrt(s.text, kw);
+    h += '<div class="sr" data-i="'+i+'" data-t="'+s.start+'">' +
+         '<span class="ts">'+t+'</span><span>'+txt+'</span></div>';
+  });
+  svc.innerHTML = h;
+  svc.querySelectorAll(".sr").forEach(row => {
+    row.ondblclick = () => seekTo(parseFloat(row.dataset.t), row);
+  });
+  syncSubtitle();
+}
+// 播放跟随: 按 currentTime 高亮当前字幕句并滚动入视
+let _curIdx = -1;
+function syncSubtitle(){
+  const v = document.getElementById("vid");
+  if (!v || !CUR.segments) return;
+  const t = v.currentTime;
+  let idx = -1;
+  for (let i = 0; i < CUR.segments.length; i++){
+    const s = CUR.segments[i];
+    if (t >= s.start && t < s.end){ idx = i; break; }
+  }
+  if (idx === _curIdx) return;
+  _curIdx = idx;
+  const rows = document.querySelectorAll("#svc .sr");
+  rows.forEach(r => r.classList.remove("cur"));
+  if (idx >= 0 && rows[idx]){
+    rows[idx].classList.add("cur");
+    rows[idx].scrollIntoView({block:"nearest"});
+  }
+}
+function seekTo(sec, row){
+  const vid = document.getElementById("vid");
+  vid.currentTime = sec;
+  document.getElementById("seek").textContent = "▶ 跳至 " + fmt(sec);
+  document.getElementById("seek").style.opacity = "1";
+  setTimeout(()=>document.getElementById("seek").style.opacity="0", 1400);
+  document.querySelectorAll(".sr.hi").forEach(r=>r.classList.remove("hi"));
+  if (row) row.classList.add("hi");
+  vid.play().catch(()=>{});
+}
+function fmt(sec){
+  sec = Math.max(0, Math.floor(sec));
+  const m = Math.floor(sec/60), s = sec%60;
+  return String(m).padStart(2,"0")+":"+String(s).padStart(2,"0");
+}
+function escapeHtml(s){
+  return s.replace(/[&<>]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;"}[c]));
+}
+function highlightSrt(text, kw){
+  if (!kw) return escapeHtml(text);
+  // 宽松匹配: 搜索词中的空白在原文中可对应 0~N 个空白字符
+  const re = new RegExp(kw.replace(/\s+/g, "\\s+"), "g");
+  let out = "", last = 0, m;
+  while ((m = re.exec(text)) !== null){
+    out += escapeHtml(text.slice(last, m.index));
+    out += '<mark>' + escapeHtml(m[0]) + '</mark>';
+    last = m.index + m[0].length;
+    // 防零宽匹配死循环
+    if (m[0].length === 0) { re.lastIndex++; continue; }
+  }
+  out += escapeHtml(text.slice(last));
+  return out || escapeHtml(text);
+}
+function looseMatch(text, kw){
+  // 去所有空白后比对, 用于快速判断是否命中
+  return text.replace(/\s+/g,"").includes(kw.replace(/\s+/g,""));
+}
+
+// ---------- 搜索高亮 ----------
+document.getElementById("searchBtn").onclick = doSearch;
+let _t;
+document.getElementById("q").addEventListener("input", e => {
+  clearTimeout(_t);
+  _t = setTimeout(doSearch, 200);
+});
+function doSearch(){
+  CUR.kw = document.getElementById("q").value.trim();
+  highlightNote(CUR.kw);
+  renderSrt(CUR.kw);
+}
+function highlightNote(kw){
+  const nv = document.getElementById("nv");
+  nv.innerHTML = nv.dataset.raw || nv.innerHTML;
+  if (!kw || !nv.dataset.raw) return;
+  const walk = document.createTreeWalker(nv, NodeFilter.SHOW_TEXT);
+  const targets = [];
+  while (walk.nextNode()){
+    if (walk.currentNode.nodeValue && looseMatch(walk.currentNode.nodeValue, kw))
+      targets.push(walk.currentNode);
+  }
+  // 用正则高亮, 忽略空白差异
+  const re = new RegExp(kw.replace(/\s+/g, "\\s+"), "g");
+  targets.forEach(tn => {
+    const s = tn.nodeValue;
+    const frag = document.createDocumentFragment();
+    let last = 0, m;
+    re.lastIndex = 0;
+    while ((m = re.exec(s)) !== null){
+      if (m.index > last) frag.appendChild(document.createTextNode(s.slice(last, m.index)));
+      const mk = document.createElement("mark"); mk.textContent = m[0];
+      frag.appendChild(mk); last = m.index + m[0].length;
+      if (m[0].length === 0) { re.lastIndex++; continue; }
+    }
+    if (last < s.length) frag.appendChild(document.createTextNode(s.slice(last)));
+    tn.parentNode.replaceChild(frag, tn);
+  });
+  const first = nv.querySelector("mark");
+  if (first) first.scrollIntoView({block:"center"});
+}
+
+// ---------- 拖拽调宽 ----------
+function enableResize(handle, target, min){
+  handle.onmousedown = e => {
+    e.preventDefault();
+    const w0 = target.offsetWidth, x0 = e.clientX;
+    document.onmousemove = ev => {
+      const w = Math.max(min, w0 + (ev.clientX - x0));
+      target.style.width = w + "px"; target.style.flex = "none";
+    };
+    document.onmouseup = () => { document.onmousemove=null; document.onmouseup=null; };
+  };
+}
+enableResize(document.getElementById("rzTree"), document.getElementById("tree"), 130);
+enableResize(document.getElementById("rzNote"), document.getElementById("note"), 280);
+
+// ---------- 笔记区 / 字幕区 高度拖拽 ----------
+function enableVResize(handle, target, min){
+  handle.onmousedown = e => {
+    e.preventDefault();
+    const h0 = target.offsetHeight, y0 = e.clientY;
+    document.onmousemove = ev => {
+      const h = Math.max(min, h0 + (ev.clientY - y0));
+      target.style.flex = "none";
+      target.style.height = h + "px";
+    };
+    document.onmouseup = () => { document.onmousemove=null; document.onmouseup=null; };
+  };
+}
+enableVResize(document.getElementById("rzNoteSrt"), document.getElementById("nv"), 120);
+
+// ---------- 隐藏/显示 ----------
+document.getElementById("hideCfg").onclick = () => {
+  document.getElementById("cfg").style.display="none";
+  document.getElementById("showCfg").style.display="inline-block";
+};
+document.getElementById("showCfg").onclick = () => {
+  document.getElementById("cfg").style.display="flex";
+  document.getElementById("showCfg").style.display="none";
+};
+document.getElementById("hideTree").onclick = () => {
+  document.getElementById("tree").style.display="none";
+  document.getElementById("showTree").style.display="inline-flex";
+};
+document.getElementById("showTree").onclick = () => {
+  document.getElementById("tree").style.display="flex";
+  document.getElementById("showTree").style.display="none";
+};
+document.getElementById("hideVideo").onclick = () => {
+  document.getElementById("video").style.display="none";
+  document.getElementById("showVideo").style.display="inline-flex";
+};
+document.getElementById("showVideo").onclick = () => {
+  document.getElementById("video").style.display="flex";
+  document.getElementById("showVideo").style.display="none";
+};
+
+// 进度条跟随
+document.getElementById("vid").addEventListener("timeupdate", e => {
+  const v = e.target;
+  if (v.duration) document.getElementById("pbi").style.width =
+    (v.currentTime / v.duration * 100) + "%";
+  syncSubtitle();
+});
+</script>
+</body>
+</html>
