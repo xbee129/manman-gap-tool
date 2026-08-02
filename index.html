@@ -12,7 +12,7 @@ button{font-family:inherit;}
 .cfg{background:#161a21;border:1px solid #262c38;border-radius:10px 10px 0 0;
   padding:10px 12px;display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;}
 .cfg .fld{flex:1;min-width:200px;}
-.cfg .lab{color:#8b95a3;font-size:11px;display:block;margin-bottom:4px;}
+.cfg .lab{color:#8b95a3;font-size:11px;display:block;margin-bottom:4px;line-height:1.6;}
 .cfg input{width:100%;background:#0f1115;border:1px solid #262c38;color:#d7dde6;
   padding:7px 9px;border-radius:7px;font-size:12px;}
 .cfg .adv{flex-basis:100%;}
@@ -120,18 +120,21 @@ mark{background:#ef9f2744;color:#fac775;border-radius:2px;}
 </head>
 <body>
 <div class="cfg" id="cfg">
-  <div class="fld"><span class="lab">课程文件夹（mp4 / srt / html 三者同处此文件夹，单路径即可加载；字幕亦自动匹配同级目录）</span>
-    <input id="videoDir" placeholder="如 D:/File/学科/数学"></div>
-  <button class="btn" id="loadBtn">加载</button>
+  <div class="fld"><span class="lab">点击下方按钮选择「课程文件夹」（mp4 / srt / html 三者同处此文件夹；字幕与同名 mp4 自动匹配，笔记按文件名关联）。数据全部在浏览器本地解析，不依赖任何服务器。建议使用 Chrome / Edge 打开。</span>
+    <button class="btn" id="pickBtn">选择课程文件夹</button>
+    <span id="folderName" style="margin-left:8px;color:#8b95a3;font-size:12px;"></span>
+    <span id="scanProgress" style="margin-left:8px;color:#9ece6a;font-size:12px;"></span>
+  </div>
   <button class="hide" id="hideCfg" title="隐藏配置栏">×</button>
 </div>
 <button class="showbtn" id="showCfg" title="显示配置栏">＋</button>
+<input type="file" id="folderInput" webkitdirectory directory multiple hidden>
 
 <div class="body">
   <div class="tree" id="tree">
     <div class="th"><span>课程内容</span>
       <button id="hideTree" title="隐藏课程树">×</button></div>
-    <div class="tc" id="tc"><div class="empty">加载后显示课程树</div></div>
+    <div class="tc" id="tc"><div class="empty">选择文件夹后显示课程树</div></div>
   </div>
   <button class="showbtn" id="showTree" style="margin:6px 4px;align-self:flex-start;" title="显示课程树">＋</button>
   <div class="rz" id="rzTree"></div>
@@ -160,26 +163,100 @@ mark{background:#ef9f2744;color:#fac775;border-radius:2px;}
 
 <script>
 const enc = p => encodeURIComponent(p);
-let CUR = {note:null, srt:null, segments:null, kw:""};
+let CUR = {note:null, srt:null, segments:null, kw:"", vidUrl:null};
+let ALL_FILES = [];
+let FILE_MAP = new Map(); // 相对路径(小写'/') -> File
 
-// ---------- 配置加载 ----------
-document.getElementById("loadBtn").onclick = async () => {
-  const v = document.getElementById("videoDir").value.trim();
-  const btn = document.getElementById("loadBtn");
-  btn.textContent = "加载中…";
-  try {
-    const r = await fetch("/api/config", {method:"POST",
-      headers:{"Content-Type":"application/json"},
-      body: JSON.stringify({root_dir:v})});
-    const d = await r.json();
-    if (!d.ok) { alert("加载失败：" + d.error); return; }
-    renderTree(d.tree);
-    document.querySelector("#tree .th span").textContent =
-      "课程内容 (" + d.stats.total + " 节 · 笔记 " + d.stats.with_note +
-      " · 字幕 " + d.stats.with_srt + ")";
-  } catch(e) { alert("请求出错：" + e); }
-  finally { btn.textContent = "加载"; }
-};
+// ---------- 归一化键(用于匹配 字幕/笔记) ----------
+function normKey(s){
+  s = (s||"").toLowerCase();
+  s = s.replace(/\.[a-z0-9]+$/i, "");            // 去扩展名
+  s = s.replace(/[\s_]+/g, "");                   // 去空格/下划线
+  s = s.replace(/课/g, "");
+  s = s.replace(/阶段\d+/g, "");
+  s = s.replace(/^[\d.\-]+/, "");                 // 去前缀序号
+  s = s.replace(/[()（）\[\]【】]/g, "");          // 去括号
+  s = s.replace(/[^一-龥a-z0-9]/gi, "");           // 只留中英文与数字
+  return s;
+}
+
+// ---------- 选择文件夹 ----------
+const folderInput = document.getElementById("folderInput");
+document.getElementById("pickBtn").onclick = () => folderInput.click();
+folderInput.addEventListener("change", e => {
+  const list = e.target.files;
+  if (!list || !list.length){
+    alert("未选择到文件。请确认浏览器支持「选择文件夹」（Chrome / Edge），并直接选中最外层课程文件夹。");
+    return;
+  }
+  ALL_FILES = [...list];
+  FILE_MAP.clear();
+  ALL_FILES.forEach(f => {
+    const rel = (f.webkitRelativePath || f.name).split("\\").join("/");
+    FILE_MAP.set(rel.toLowerCase(), f);
+  });
+  const rootName = (ALL_FILES[0].webkitRelativePath || ALL_FILES[0].name).split("/")[0];
+  document.getElementById("folderName").textContent = rootName;
+  buildAndRender();
+});
+
+// ---------- 构建树 + 匹配字幕/笔记 ----------
+function buildAndRender(){
+  const setProgress = (d,t)=> document.getElementById("scanProgress").textContent =
+    t ? `扫描中 ${d}/${t}` : "";
+  const htmlFiles = ALL_FILES.filter(f => /\.html?$/i.test(f.name));
+  const root = {type:"dir", name:"__root__", children:[]};
+  const mp4List = [];
+  const mp4Items = ALL_FILES.filter(f => /\.mp4$/i.test(f.name));
+  let done = 0;
+  mp4Items.forEach(f => {
+    const rel = (f.webkitRelativePath || f.name).split("\\").join("/");
+    const parts = rel.split("/");
+    const fileName = parts.pop();
+    let node = root;
+    parts.forEach(p => {
+      let c = node.children.find(x => x.type === "dir" && x.name === p);
+      if (!c){ c = {type:"dir", name:p, children:[]}; node.children.push(c); }
+      node = c;
+    });
+    const base = fileName.replace(/\.mp4$/i, "");
+    // 字幕: 同目录同名 .srt
+    const srtRel = parts.concat(base + ".srt").join("/");
+    const srtFile = FILE_MAP.get(srtRel.toLowerCase()) || null;
+    // 笔记: 同目录 html，文件名(归一化)包含 mp4 名；优先精确同名
+    let noteFile = null, fuzzy = null;
+    const mp4n = normKey(base);
+    htmlFiles.forEach(nf => {
+      const nrel = (nf.webkitRelativePath || nf.name).split("\\").join("/");
+      const np = nrel.split("/"); np.pop();
+      if (np.join("/") !== parts.join("/")) return;     // 必须同目录
+      const nn = normKey(nf.name);
+      if (nn === mp4n) noteFile = nf;
+      else if (!fuzzy && (nn.includes(mp4n) || mp4n.includes(nn))) fuzzy = nf;
+    });
+    if (!noteFile && fuzzy) noteFile = fuzzy;
+    const leaf = {
+      type:"file", name:fileName, path:rel, file:f,
+      srt: srtFile ? srtRel : null,
+      note: noteFile ? (noteFile.webkitRelativePath || noteFile.name) : null,
+      _srtFile: srtFile, _noteFile: noteFile
+    };
+    node.children.push(leaf);
+    mp4List.push(leaf);
+    done++; setProgress(done, mp4Items.length);
+  });
+  setProgress(0,0);
+  renderTree(root.children);
+  const total = mp4List.length;
+  const withNote = mp4List.filter(l => l.note).length;
+  const withSrt = mp4List.filter(l => l.srt).length;
+  document.querySelector("#tree .th span").textContent =
+    `课程内容 (${total} 节 · 笔记 ${withNote} · 字幕 ${withSrt})`;
+  if (!total){
+    document.getElementById("tc").innerHTML =
+      '<div class="empty">该文件夹下未找到 mp4 视频。<br>请把 mp4 / srt / html 放在同一文件夹后重新选择。</div>';
+  }
+}
 
 // ---------- 课程树 ----------
 function renderTree(nodes){
@@ -221,17 +298,18 @@ async function selectLeaf(nd, el){
   document.querySelectorAll(".node.file.sel").forEach(n=>n.classList.remove("sel"));
   el.classList.add("sel");
   const vid = document.getElementById("vid");
-  vid.src = "/video?path=" + enc(nd.path);
+  if (CUR.vidUrl) URL.revokeObjectURL(CUR.vidUrl);
+  CUR.vidUrl = URL.createObjectURL(nd.file);
+  vid.src = CUR.vidUrl;
   vid.load();
   document.getElementById("vhText").textContent = "视频回看 · " + nd.name;
   CUR.note = nd.note; CUR.srt = nd.srt; CUR.segments = null; CUR.kw = "";
   document.getElementById("q").value = "";
 
   const nv = document.getElementById("nv");
-  if (nd.note){
+  if (nd._noteFile){
     try {
-      const r = await fetch("/note?path=" + enc(nd.note));
-      let html = await r.text();
+      let html = await nd._noteFile.text();
       html = rewriteAssets(html, nd.note);
       nv.dataset.raw = html;
       nv.innerHTML = html;
@@ -241,10 +319,10 @@ async function selectLeaf(nd, el){
     nv.innerHTML = '<div class="empty">本节无 AI 笔记</div>';
   }
 
-  if (nd.srt){
+  if (nd._srtFile){
     try {
-      const r = await fetch("/srt?path=" + enc(nd.srt));
-      const d = await r.json();
+      const txt = await nd._srtFile.text();
+      const d = parseSrt(txt);
       CUR.segments = d.segments;
       renderSrt("");
     } catch(e){ document.getElementById("svc").innerHTML = '<div class="empty">字幕加载失败</div>'; }
@@ -254,17 +332,41 @@ async function selectLeaf(nd, el){
   }
 }
 
-function rewriteAssets(html, notePath){
-  // 去除脚本, 避免意外执行; 重写相对资源到 /noteasset
+function rewriteAssets(html, noteRel){
+  // 去除脚本, 避免意外执行; 相对资源重写为本地 blob URL
   html = html.replace(/<script[\s\S]*?<\/script>/gi, "");
   html = html.replace(/<script[^>]*>/gi, "");
-  const dir = notePath.replace(/[\\\/][^\\\/]*$/, "");
+  const dir = noteRel.replace(/[\\\/][^\\\/]*$/, "");
   html = html.replace(/(src|href)\s*=\s*"([^"]+)"/gi, (m, attr, url) => {
-    if (/^(https?:|data:|#|\/noteasset)/i.test(url)) return m;
-    const abs = dir + "/" + url;
-    return attr + '="/noteasset?path=' + enc(abs) + '"';
+    if (/^(https?:|data:|#|blob:)/i.test(url)) return m;
+    if (/^\//.test(url)) return m;                 // 绝对路径在浏览器内无法定位, 跳过
+    const absRel = (dir ? dir + "/" : "") + url;
+    const f = FILE_MAP.get(absRel.split("\\").join("/").toLowerCase());
+    if (f){ const bu = URL.createObjectURL(f); return attr + '="' + bu + '"'; }
+    return m;
   });
   return html;
+}
+
+// ---------- SRT 解析 ----------
+function parseSrt(text){
+  const segs = [];
+  const blocks = text.replace(/\r/g, "").split(/\n\s*\n/);
+  const re = /(?:(\d{1,2}):)?(\d{1,2}):(\d{1,2})[,.](\d{1,3})\s*-->\s*(?:(\d{1,2}):)?(\d{1,2}):(\d{1,2})[,.](\d{1,3})/;
+  const toSec = (h,mm,ss,ms) => (parseInt(h||0,10)*3600) + (parseInt(mm,10)*60) + parseInt(ss,10) + parseInt(ms,10)/1000;
+  for (const b of blocks){
+    const lines = b.split("\n").filter(l => l.trim() !== "");
+    if (!lines.length) continue;
+    const idx = lines.findIndex(l => re.test(l));
+    if (idx < 0) continue;
+    const m = lines[idx].match(re);
+    if (!m) continue;
+    const start = toSec(m[1],m[2],m[3],m[4]);
+    const end = toSec(m[5],m[6],m[7],m[8]);
+    const txt = lines.slice(idx+1).join("\n").trim();
+    segs.push({start, end, text:txt});
+  }
+  return {segments:segs};
 }
 
 // ---------- 字幕渲染 + 跳播 ----------
@@ -329,21 +431,18 @@ function escapeHtml(s){
 }
 function highlightSrt(text, kw){
   if (!kw) return escapeHtml(text);
-  // 宽松匹配: 搜索词中的空白在原文中可对应 0~N 个空白字符
   const re = new RegExp(kw.replace(/\s+/g, "\\s+"), "g");
   let out = "", last = 0, m;
   while ((m = re.exec(text)) !== null){
     out += escapeHtml(text.slice(last, m.index));
     out += '<mark>' + escapeHtml(m[0]) + '</mark>';
     last = m.index + m[0].length;
-    // 防零宽匹配死循环
     if (m[0].length === 0) { re.lastIndex++; continue; }
   }
   out += escapeHtml(text.slice(last));
   return out || escapeHtml(text);
 }
 function looseMatch(text, kw){
-  // 去所有空白后比对, 用于快速判断是否命中
   return text.replace(/\s+/g,"").includes(kw.replace(/\s+/g,""));
 }
 
@@ -369,7 +468,6 @@ function highlightNote(kw){
     if (walk.currentNode.nodeValue && looseMatch(walk.currentNode.nodeValue, kw))
       targets.push(walk.currentNode);
   }
-  // 用正则高亮, 忽略空白差异
   const re = new RegExp(kw.replace(/\s+/g, "\\s+"), "g");
   targets.forEach(tn => {
     const s = tn.nodeValue;
